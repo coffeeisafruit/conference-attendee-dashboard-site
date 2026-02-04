@@ -144,6 +144,45 @@ function IconSparkle({ className = 'w-4 h-4' }) {
   );
 }
 
+function IconVerified({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2" fill="none"/>
+    </svg>
+  );
+}
+
+function IconQuestion({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  );
+}
+
+// Get verification status styling
+function getVerificationStyle(status) {
+  if (status === 'website_verified' || status === 'verified') {
+    return {
+      label: 'Verified',
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bg: 'bg-emerald-100/60 dark:bg-emerald-900/30',
+      icon: IconVerified
+    };
+  }
+  if (status === 'unsure') {
+    return {
+      label: 'Unsure',
+      color: 'text-amber-600 dark:text-amber-400',
+      bg: 'bg-amber-100/60 dark:bg-amber-900/30',
+      icon: IconQuestion
+    };
+  }
+  return null;
+}
+
 // ─────────────────────────────────────────────────────────────
 // COMPONENTS
 // ─────────────────────────────────────────────────────────────
@@ -270,6 +309,12 @@ function AttendeeCard({ row, totalRows, expanded, onToggle, viewMode }) {
           {hasEnrichment && (
             <IconSparkle className="w-4 h-4 text-amber-500" title="OWL enriched" />
           )}
+          {row.owl_verification_status === 'unsure' && (
+            <IconQuestion className="w-4 h-4 text-amber-500" title="Unsure - needs verification" />
+          )}
+          {(row.owl_verification_status === 'verified' || row.owl_verification_status === 'website_verified') && (
+            <IconVerified className="w-4 h-4 text-emerald-500" title="Verified" />
+          )}
           <IconChevron direction={expanded ? 'up' : 'down'} className="w-5 h-5 text-slate-400" />
         </div>
       </div>
@@ -336,6 +381,17 @@ function AttendeeCard({ row, totalRows, expanded, onToggle, viewMode }) {
                   Enriched
                 </span>
               )}
+              {(() => {
+                const vStyle = getVerificationStyle(row.owl_verification_status);
+                if (!vStyle) return null;
+                const VIcon = vStyle.icon;
+                return (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${vStyle.color} ${vStyle.bg}`}>
+                    <VIcon className="w-3 h-3" />
+                    {vStyle.label}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
@@ -431,6 +487,17 @@ function AttendeeCard({ row, totalRows, expanded, onToggle, viewMode }) {
                 <p className="text-sm text-slate-600 dark:text-slate-400 bg-white/60 dark:bg-black/20 rounded-xl p-3">{row.priority_reason}</p>
               </div>
             )}
+
+            {/* Verification status */}
+            {row.owl_verification_status && (
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Verification Status</h4>
+                <div className={`text-sm rounded-xl p-3 ${row.owl_verification_status === 'unsure' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200'}`}>
+                  <div className="font-semibold capitalize">{row.owl_verification_status.replace('_', ' ')}</div>
+                  {row.owl_verification_notes && <div className="mt-1 text-xs opacity-80">{row.owl_verification_notes}</div>}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -480,7 +547,9 @@ function Dashboard() {
     const top20 = rows.filter(r => n(r.priority_rank) <= 20).length;
     const withEmail = rows.filter(r => (r.email || '').trim()).length;
     const withLinkedin = rows.filter(r => (r.linkedin_url || '').trim()).length;
-    return { total, contactable, enriched, top20, withEmail, withLinkedin };
+    const verified = rows.filter(r => r.owl_verification_status === 'verified' || r.owl_verification_status === 'website_verified').length;
+    const unsure = rows.filter(r => r.owl_verification_status === 'unsure').length;
+    return { total, contactable, enriched, top20, withEmail, withLinkedin, verified, unsure };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -490,6 +559,8 @@ function Dashboard() {
     if (filter === 'contactable') result = result.filter(hasContact);
     if (filter === 'enriched') result = result.filter(r => r.owl_seeking || r.owl_who_you_serve);
     if (filter === 'top20') result = result.filter(r => n(r.priority_rank) <= 20);
+    if (filter === 'verified') result = result.filter(r => r.owl_verification_status === 'verified' || r.owl_verification_status === 'website_verified');
+    if (filter === 'unsure') result = result.filter(r => r.owl_verification_status === 'unsure');
 
     // Apply search
     if (search.trim()) {
@@ -544,10 +615,10 @@ function Dashboard() {
           {/* Stats panel */}
           {showStats && (
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 animate-fadeIn">
+              <StatCard label="Verified" value={stats.verified} subtext={`${Math.round(stats.verified/stats.total*100)}% independently confirmed`} accent />
+              <StatCard label="Unsure" value={stats.unsure} subtext="Need manual verification" />
+              <StatCard label="OWL Enriched" value={stats.enriched} subtext="With research insights" />
               <StatCard label="Contactable" value={stats.contactable} subtext={`${Math.round(stats.contactable/stats.total*100)}% have email/phone`} />
-              <StatCard label="OWL Enriched" value={stats.enriched} subtext="With research insights" accent />
-              <StatCard label="Top Priority" value={stats.top20} subtext="Rank 1-20" />
-              <StatCard label="LinkedIn" value={stats.withLinkedin} subtext="Profile linked" />
             </div>
           )}
 
@@ -569,6 +640,8 @@ function Dashboard() {
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
             {[
               { key: 'all', label: 'All' },
+              { key: 'verified', label: `Verified (${stats.verified})` },
+              { key: 'unsure', label: `Unsure (${stats.unsure})` },
               { key: 'top20', label: 'Top 20' },
               { key: 'contactable', label: 'Contactable' },
               { key: 'enriched', label: 'Enriched' },
@@ -617,7 +690,11 @@ function Dashboard() {
         <div className="mt-8 text-center text-xs text-slate-400 dark:text-slate-600">
           <a href="attendees.csv" className="hover:underline">Download CSV</a>
           <span className="mx-2">·</span>
-          <span>{stats.enriched} profiles enriched with OWL research</span>
+          <span>{stats.verified} verified ({Math.round(stats.verified/stats.total*100)}%)</span>
+          <span className="mx-2">·</span>
+          <span>{stats.unsure} unsure</span>
+          <span className="mx-2">·</span>
+          <span>{stats.enriched} enriched</span>
         </div>
       </main>
 
