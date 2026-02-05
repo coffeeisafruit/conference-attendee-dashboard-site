@@ -292,9 +292,14 @@ function AttendeeCard({ row, totalRows, expanded, onToggle, viewMode }) {
   // Compact mode for list view
   if (viewMode === 'compact') {
     return (
-      <div
+      <article
         onClick={onToggle}
-        className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200 border ${tier.bg} ${tier.border} hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-slate-900/50 hover:-translate-y-0.5 active:translate-y-0`}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        tabIndex={0}
+        role="button"
+        aria-expanded={expanded}
+        aria-label={`${row.name}${row.organization ? `, ${row.organization}` : ''}. Rank ${rank}. Click to ${expanded ? 'collapse' : 'expand'} details.`}
+        className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200 border ${tier.bg} ${tier.border} hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-slate-900/50 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900`}
       >
         {/* Rank badge */}
         <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${tier.color} flex items-center justify-center text-white font-bold text-sm shadow-lg flex-shrink-0`}>
@@ -333,15 +338,18 @@ function AttendeeCard({ row, totalRows, expanded, onToggle, viewMode }) {
               <vStyle.icon className={`w-3.5 h-3.5 ${vStyle.color}`} />
             </div>
           )}
-          <IconChevron direction={expanded ? 'up' : 'down'} className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-slate-400" />
+          <IconChevron direction={expanded ? 'up' : 'down'} className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-slate-400" aria-hidden="true" />
         </div>
-      </div>
+      </article>
     );
   }
 
   // Full card view
   return (
-    <div className={`rounded-2xl overflow-hidden transition-all duration-300 ${expanded ? 'shadow-2xl shadow-slate-300/50 dark:shadow-slate-900/50 ring-1 ring-slate-200 dark:ring-slate-700' : 'shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 hover:shadow-xl hover:-translate-y-1'}`}>
+    <article
+      aria-label={`${row.name}${row.organization ? `, ${row.organization}` : ''}. Rank ${rank}.`}
+      className={`rounded-2xl overflow-hidden transition-all duration-300 ${expanded ? 'shadow-2xl shadow-slate-300/50 dark:shadow-slate-900/50 ring-1 ring-slate-200 dark:ring-slate-700' : 'shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 hover:shadow-xl hover:-translate-y-1'}`}
+    >
       {/* Priority band */}
       <div className={`h-1.5 bg-gradient-to-r ${tier.color}`} />
 
@@ -404,9 +412,11 @@ function AttendeeCard({ row, totalRows, expanded, onToggle, viewMode }) {
           {/* Expand toggle */}
           <button
             onClick={onToggle}
-            className="w-10 h-10 rounded-xl bg-white/80 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all flex-shrink-0 shadow-sm border border-slate-100 dark:border-slate-700"
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Collapse details' : 'Expand details'}
+            className="w-10 h-10 rounded-xl bg-white/80 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all flex-shrink-0 shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
-            <IconChevron direction={expanded ? 'up' : 'down'} />
+            <IconChevron direction={expanded ? 'up' : 'down'} aria-hidden="true" />
           </button>
         </div>
 
@@ -518,7 +528,7 @@ function AttendeeCard({ row, totalRows, expanded, onToggle, viewMode }) {
           </div>
         )}
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -559,8 +569,17 @@ function Dashboard() {
   const [filter, setFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
   const [viewMode, setViewMode] = useState('cards');
-  const [darkMode, setDarkMode] = useState(false);
   const [showStats, setShowStats] = useState(true);
+
+  // Initialize dark mode from localStorage or system preference
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('darkMode');
+      if (saved !== null) return saved === 'true';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
 
   useEffect(() => {
     const v = window.__BUILD_TS__ || Date.now();
@@ -570,9 +589,22 @@ function Dashboard() {
       .catch(() => setRows([]));
   }, []);
 
+  // Persist dark mode preference and apply to document
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
+
+  // Listen for system preference changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      const saved = localStorage.getItem('darkMode');
+      if (saved === null) setDarkMode(e.matches);
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -623,24 +655,25 @@ function Dashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowStats(!showStats)}
-                className={`p-2.5 rounded-xl transition-all ${showStats ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                title="Toggle stats"
+                className={`p-2.5 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${showStats ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                aria-label={showStats ? 'Hide statistics' : 'Show statistics'}
+                aria-pressed={showStats}
               >
-                <IconChart className="w-5 h-5" />
+                <IconChart className="w-5 h-5" aria-hidden="true" />
               </button>
               <button
                 onClick={() => setViewMode(v => v === 'cards' ? 'compact' : 'cards')}
-                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-                title={viewMode === 'cards' ? 'Switch to list' : 'Switch to cards'}
+                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                aria-label={viewMode === 'cards' ? 'Switch to list view' : 'Switch to card view'}
               >
-                {viewMode === 'cards' ? <IconList className="w-5 h-5" /> : <IconGrid className="w-5 h-5" />}
+                {viewMode === 'cards' ? <IconList className="w-5 h-5" aria-hidden="true" /> : <IconGrid className="w-5 h-5" aria-hidden="true" />}
               </button>
               <button
                 onClick={() => setDarkMode(!darkMode)}
-                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-                title="Toggle dark mode"
+                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
               >
-                {darkMode ? <IconSun className="w-5 h-5" /> : <IconMoon className="w-5 h-5" />}
+                {darkMode ? <IconSun className="w-5 h-5" aria-hidden="true" /> : <IconMoon className="w-5 h-5" aria-hidden="true" />}
               </button>
             </div>
           </div>
@@ -656,51 +689,64 @@ function Dashboard() {
           )}
 
           {/* Search */}
-          <div className="mt-4">
+          <div className="mt-4" role="search">
+            <label htmlFor="search-input" className="sr-only">Search contacts</label>
             <div className="relative">
-              <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" aria-hidden="true" />
               <input
-                type="text"
+                id="search-input"
+                type="search"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search by name, company, or niche..."
-                className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300 dark:focus:border-indigo-700 transition-all shadow-sm"
+                className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 focus:border-indigo-400 dark:focus:border-indigo-600 transition-all shadow-sm"
+                aria-label="Search contacts by name, company, or niche"
               />
             </div>
           </div>
 
           {/* Filters */}
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-            {[
-              { key: 'all', label: 'All', count: stats.total },
-              { key: 'verified', label: 'Verified', count: stats.verified },
-              { key: 'unsure', label: 'Unverified', count: stats.unsure },
-              { key: 'top20', label: 'Top 20', count: stats.top20 },
-              { key: 'enriched', label: 'Enriched', count: stats.enriched },
-              { key: 'contactable', label: 'Contactable', count: stats.contactable },
-            ].map(f => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                  filter === f.key
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg shadow-slate-900/20 dark:shadow-white/10'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                {f.label}
-                <span className={`ml-1.5 ${filter === f.key ? 'text-white/70 dark:text-slate-900/70' : 'text-slate-400 dark:text-slate-500'}`}>
-                  {f.count}
-                </span>
-              </button>
-            ))}
-          </div>
+          <nav className="mt-3" aria-label="Filter contacts">
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide" role="tablist">
+              {[
+                { key: 'all', label: 'All', count: stats.total },
+                { key: 'verified', label: 'Verified', count: stats.verified },
+                { key: 'unsure', label: 'Unverified', count: stats.unsure },
+                { key: 'top20', label: 'Top 20', count: stats.top20 },
+                { key: 'enriched', label: 'Enriched', count: stats.enriched },
+                { key: 'contactable', label: 'Contactable', count: stats.contactable },
+              ].map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  role="tab"
+                  aria-selected={filter === f.key}
+                  aria-controls="contacts-list"
+                  className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+                    filter === f.key
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-lg shadow-slate-900/20 dark:shadow-white/10'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  {f.label}
+                  <span className={`ml-1.5 ${filter === f.key ? 'text-white/70 dark:text-slate-900/70' : 'text-slate-400 dark:text-slate-500'}`} aria-label={`${f.count} contacts`}>
+                    {f.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </nav>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
-        <div className={viewMode === 'compact' ? 'space-y-2' : 'space-y-4'}>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6" role="main">
+        <div
+          id="contacts-list"
+          role="tabpanel"
+          aria-label={`${filter === 'all' ? 'All' : filter} contacts`}
+          className={viewMode === 'compact' ? 'space-y-2' : 'space-y-4'}
+        >
           {filtered.map(row => (
             <AttendeeCard
               key={row.priority_rank || row.name}
@@ -755,6 +801,31 @@ function Dashboard() {
         .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+        .sr-only {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
+        /* Improved focus visibility for keyboard navigation */
+        :focus-visible {
+          outline: 2px solid #6366f1;
+          outline-offset: 2px;
+        }
+        /* Respect reduced motion preferences */
+        @media (prefers-reduced-motion: reduce) {
+          .animate-fadeIn {
+            animation: none;
+          }
+          * {
+            transition-duration: 0.01ms !important;
+          }
         }
       `}</style>
     </div>
