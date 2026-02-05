@@ -476,6 +476,8 @@ function Dashboard() {
           font-size: 16px;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
+          width: 100%;
+          overflow-x: hidden;
         }
 
         body {
@@ -484,12 +486,16 @@ function Dashboard() {
           color: var(--text-primary);
           line-height: 1.6;
           min-height: 100vh;
+          width: 100%;
+          overflow-x: hidden;
         }
 
         .app {
           max-width: 800px;
           margin: 0 auto;
           padding: 0 24px;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         /* Header */
@@ -962,7 +968,11 @@ function Dashboard() {
 
         /* Responsive */
         @media (max-width: 640px) {
-          .app { padding: 0 16px; }
+          .app { 
+            padding: 0 16px; 
+            width: 100%;
+            max-width: 100%;
+          }
           .stats-row { grid-template-columns: repeat(2, 1fr); }
           .header h1 { font-size: 1.5rem; }
           .card__scores { grid-template-columns: repeat(2, 1fr); }
